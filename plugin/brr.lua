@@ -53,6 +53,8 @@ local function createFloatingWindow(opts)
 
   vim.bo[buf].filetype = "markdown"
 
+  -- set close keymap
+
   local width = vim.o.columns
   local height = vim.o.lines
 
@@ -67,6 +69,8 @@ local function createFloatingWindow(opts)
   }
 
   local win = vim.api.nvim_open_win(buf, true, winConfig)
+
+  vim.keymap.set('n', 'q', function() vim.api.nvim_win_close(win, false) end, { desc = "Close scratchpad", buffer=buf })
 
   return { buf, win }
 end
