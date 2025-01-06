@@ -4,39 +4,50 @@ local M = {}
 --  Should have global and local modes
 -- Add command for selecting scratch file
 -- Add command to open given scratch file
--- Add fancy header/footer
--- Add quit on q
 --
 -- Things to figure out
--- How to store scratch file information
---  Maybe a local ~/.scratches file?
---    Could do json
 -- How to handle how the scratch file is opened
 --  Multiple commands or settings to define how all scratch files are opened/set
 --  Maybe a per scratch config? ( maybe later )
 
+---@class brr.Style
+---@field padding number
+
 ---@class brr.Config
 ---@field root string
+---@field style brr.Style
 local options = {
-  root = "~/.scratch_notes/"
+  root = "~/.scratch_notes/",
+  style = {
+    padding = 2
+  }
 }
 
 M.setup = function()
   -- nothing
 end
 
+
+M.close_scratch_window = function(win, buf)
+  return function()
+    vim.api.nvim_win_close(win, false)
+    vim.api.nvim_buf_delete(buf, { force = true })
+  end
+end
+
+
 ---@class brr.ScratchConfig
 ---@field file? string filename to open
 
 ---@param opts brr.ScratchConfig
-local function createFloatingWindow(opts)
+M.open_scratch_file = function(opts)
   opts = opts or {}
   local file = opts.file
   -- Could add to config
-  local dateFormat = "%Y-%m-%d"
+  local date_format = "%Y-%m-%d"
 
   if not file then
-    file = tostring(os.date(dateFormat))
+    file = tostring(os.date(date_format)) .. ".md"
   end
 
   local root = vim.fs.normalize(options.root)
@@ -53,29 +64,40 @@ local function createFloatingWindow(opts)
 
   vim.bo[buf].filetype = "markdown"
 
-  -- set close keymap
+  local padding = string.rep(" ", options.style.padding)
+  local title = padding .. file .. padding
 
   local width = vim.o.columns
   local height = vim.o.lines
 
-  local winConfig = {
+
+  local win_config = {
     relative = "editor",
     width = width - 8,
     height = height - 8,
     border = 'rounded',
     col = 4,
     row = 4,
-    zindex = 2
+    zindex = 2,
+    title = title,
+    title_pos = "center"
   }
 
-  local win = vim.api.nvim_open_win(buf, true, winConfig)
+  local win = vim.api.nvim_open_win(buf, true, win_config)
 
-  vim.keymap.set('n', 'q', function() vim.api.nvim_win_close(win, false) end, { desc = "Close scratchpad", buffer=buf })
+  vim.keymap.set('n', 'q', M.close_scratch_window(win, buf), { desc = "Close scratchpad", buffer=buf })
+
+
+  -- Write to file on buf hidden
+  vim.api.nvim_create_autocmd("BufHidden", {
+    group = vim.api.nvim_create_augroup("brr_scratch_autowrite" .. buf, { clear = true }),
+    buffer = buf,
+    callback = function()
+      vim.cmd('write')
+    end
+  })
 
   return { buf, win }
 end
-
-createFloatingWindow()
-
 
 return M
