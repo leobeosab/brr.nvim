@@ -4,14 +4,10 @@ local M = {}
 --  Should have global and local modes
 -- Add command for selecting scratch file
 -- Add command to open given scratch file
+-- Add resize listeners
 --
 -- Maybes?
 --  Optional config for daily files ( where no filename is passed and we use the date instead )
---
--- Things to figure out
--- How to handle how the scratch file is opened
---  Multiple commands or settings to define how all scratch files are opened/set
---  Maybe a per scratch config? ( maybe later )
 
 ---@class brr.Style
 ---@field padding number
@@ -78,7 +74,9 @@ local check_if_buffer_is_opened = function(filepath, win_id)
 end
 
 
-M.close_scratch_window = function(win, buf)
+---@param win number window id
+---@param buf number buffer id
+M.close_scratch_file = function(win, buf)
   return function()
     vim.api.nvim_win_close(win, true)
     vim.api.nvim_buf_delete(buf, { force = true })
@@ -100,8 +98,8 @@ M.open_scratch_file = function(file)
 
   -- If buf is already open, close window
   local buf = check_if_buffer_is_opened(filepath, window)
-  if buf then
-    M.close_scratch_window(window, buf)()
+  if buf and window then
+    M.close_scratch_file(window, buf)()
     return
   end
 
@@ -140,7 +138,7 @@ M.open_scratch_file = function(file)
     window = vim.api.nvim_open_win(buf, true, config)
   end
 
-  vim.keymap.set('n', 'q', M.close_scratch_window(window, buf), { desc = "Close scratchpad", buffer=buf })
+  vim.keymap.set('n', 'q', M.close_scratch_file(window, buf), { desc = "Close scratchpad", buffer=buf })
 
   return { buf }
 end
