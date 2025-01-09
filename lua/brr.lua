@@ -1,3 +1,9 @@
+local pickers = require("telescope.pickers")
+local finders = require("telescope.finders")
+local previewers = require("telescope.previewers")
+local actions = require("telescope.actions")
+local conf = require("telescope.config").values
+
 local M = {}
 -- Add command for toggling scratch file
 -- Add command for adding scratch file
@@ -71,6 +77,40 @@ local check_if_buffer_is_opened = function(filepath, win_id)
   end
 
   return buf
+end
+
+M.scratch_file_list = function()
+  local normalized_path = vim.fs.normalize(options.root)
+  local file_iterator = vim.fs.dir(normalized_path)
+  local files = {}
+
+  local file = file_iterator()
+  while file ~= nil do
+    files[#files+1] = { normalized_path .. "/" .. file, file }
+    file = file_iterator()
+  end
+
+  return files
+end
+
+-- Uses Telescope for now, I might make this an optional dependency
+M.open_scratch_list = function()
+  pickers.new({}, {
+    prompt_title = "Scratch Files",
+    finder = finders.new_table {
+      results = M.scratch_file_list(),
+      entry_maker = function(entry)
+        print(entry[1])
+        return {
+          value = entry,
+          display = entry[2],
+          ordinal = entry[2],
+          filename = entry[1],
+        }
+      end
+    },
+    previewer = conf.file_previewer({})
+  }):find()
 end
 
 
