@@ -1,4 +1,4 @@
-## Brr.nvim
+## brr.nvim
 This is a scratch file project based off of Folke's in the wonderful [snacks.nvim](https://github.com/folke/snacks.nvim) plugin. That one was more directory / git based. I just wanted a simple global scratch folder for daily notes, persistent todos, temporary link storage, etc. This was also a great excuse to write my first ( very simple ) nvim plugin.
 
 I plan to make a companion plugin that will allow you to run code in markdown codeblocks like TJ Devries has done in his [present.nvim](https://github.com/tjdevries/present.nvim) plugin. 
@@ -48,3 +48,10 @@ Usage
 
 ## Screenshot(s)
 ![brr.nvim screenshot](readme_assets/brrnvim.jpg)
+
+## Things you should use instead
+* [snacks.nvim](https://github.com/folke/snacks.nvim)
+
+## Special thanks
+* [Folke](https://github.com/folke) makes a ton of awesome plugins
+* [TJDevries](https://github.com/tjdevries) makes great plugins and videos about neovim
