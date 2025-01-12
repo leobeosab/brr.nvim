@@ -1,22 +1,13 @@
 local pickers = require("telescope.pickers")
 local finders = require("telescope.finders")
-local previewers = require("telescope.previewers")
-local actions = require("telescope.actions")
 local conf = require("telescope.config").values
 
 local M = {}
--- Add command for toggling scratch file
--- Add command for adding scratch file
---  Should have global and local modes
--- Add command for selecting scratch file
--- Add command to open given scratch file
--- Add resize listeners
---
--- Maybes?
---  Optional config for daily files ( where no filename is passed and we use the date instead )
 
 ---@class brr.Style
----@field padding number
+---@field title_padding number number of spaces on each side of scratch title
+---@field width number decimal value 0-1, 1 is full width, 0 is 0 width
+---@field height number decimal value 0-1, 1 is full height, 0 is 0 height
 
 ---@class brr.Config
 ---@field root string
@@ -24,23 +15,73 @@ local M = {}
 local options = {
   root = "~/.scratch_notes/",
   style = {
-    padding = 2
+    title_padding = 2,
+    width = 0.8,
+    height = 0.8,
   }
 }
 
 local window_config = {
   relative = "editor",
   border = 'rounded',
-  col = 4,
-  row = 4,
   zindex = 2,
   title_pos = "center"
 }
 
 local window = nil
 
-M.setup = function()
-  -- nothing
+---@param opts brr.Config
+M.setup = function(opts)
+  opts = opts or {}
+  local style = opts.style or {}
+
+  options.root = opts.root or options.root
+
+  for k, v in pairs(style) do
+    options.style[k] = v
+  end
+end
+
+---@class window_config
+---@field width number
+---@field height number
+---@field col number
+---@field row number
+local get_win_size = function()
+  local vim_width = vim.o.columns
+  local vim_height = vim.o.lines
+
+  local win_width = math.floor(vim_width * options.style.width)
+  local win_height = math.floor(vim_height * options.style.height)
+
+  local col = math.floor((vim_width - win_width) / 2)
+  local row = math.floor((vim_height - win_height) / 2)
+
+  return {
+    width = win_width,
+    height = win_height,
+    col = col,
+    row = row
+  }
+end
+
+---@param win number window id
+---@return function
+local resize_window = function(win)
+  return function()
+    if not vim.api.nvim_win_is_valid(win) then
+      return
+    end
+
+    local win_size = get_win_size()
+    vim.api.nvim_win_set_config(win, {
+      width = win_size.width,
+      height = win_size.height,
+      row = win_size.row,
+      col = win_size.col,
+      relative = 'editor',
+    })
+  end
 end
 
 ---@return string current date
@@ -71,7 +112,7 @@ local check_if_buffer_is_opened = function(filepath, win_id)
     ::continue::
   end
 
-  if buf and win_id then
+  if buf and win_id and vim.api.nvim_win_is_valid(win_id) then
     local win_buff = vim.api.nvim_win_get_buf(win_id)
     buf = win_buff == buf and buf or nil
   end
@@ -79,6 +120,9 @@ local check_if_buffer_is_opened = function(filepath, win_id)
   return buf
 end
 
+-- Gets a list of the scatch files in the root dir
+---@alias FileTuple { string, string }
+---@return table list of file names
 M.scratch_file_list = function()
   local normalized_path = vim.fs.normalize(options.root)
   local file_iterator = vim.fs.dir(normalized_path)
@@ -86,7 +130,7 @@ M.scratch_file_list = function()
 
   local file = file_iterator()
   while file ~= nil do
-    files[#files+1] = { normalized_path .. "/" .. file, file }
+    files[#files + 1] = { normalized_path .. "/" .. file, file }
     file = file_iterator()
   end
 
@@ -94,6 +138,7 @@ M.scratch_file_list = function()
 end
 
 -- Uses Telescope for now, I might make this an optional dependency
+-- Opens a scratch file list of all files in the root_dir
 M.open_scratch_list = function()
   pickers.new({}, {
     prompt_title = "Scratch Files",
@@ -125,9 +170,14 @@ end
 
 
 ---@param file? string
+---@return number buffer id
 M.open_scratch_file = function(file)
-  if not file then
+  if not file or file == '' then
     file = get_current_date()
+  end
+
+  if window and not vim.api.nvim_win_is_valid(window) then
+    window = nil
   end
 
   local root = vim.fs.normalize(options.root)
@@ -140,7 +190,7 @@ M.open_scratch_file = function(file)
   local buf = check_if_buffer_is_opened(filepath, window)
   if buf and window then
     M.close_scratch_file(window, buf)()
-    return
+    return -1
   end
 
   buf = vim.fn.bufadd(filepath)
@@ -160,15 +210,15 @@ M.open_scratch_file = function(file)
     end
   })
 
-  local padding = string.rep(" ", options.style.padding)
+  local padding = string.rep(" ", options.style.title_padding)
   local title = padding .. file .. padding
 
-  local width = vim.o.columns
-  local height = vim.o.lines
-
+  local win_size = get_win_size()
   local config = vim.fn.deepcopy(window_config)
-  config.width = width - 8
-  config.height = height - 8
+  config.width = win_size.width
+  config.height = win_size.height
+  config.row = win_size.row
+  config.col = win_size.col
   config.title = title
 
 
@@ -176,11 +226,14 @@ M.open_scratch_file = function(file)
     vim.api.nvim_win_set_buf(window, buf)
   else
     window = vim.api.nvim_open_win(buf, true, config)
+    vim.api.nvim_create_autocmd("VimResized", {
+      callback = resize_window(window)
+    })
   end
 
-  vim.keymap.set('n', 'q', M.close_scratch_file(window, buf), { desc = "Close scratchpad", buffer=buf })
+  vim.keymap.set('n', 'q', M.close_scratch_file(window, buf), { desc = "Close scratchpad", buffer = buf })
 
-  return { buf }
+  return buf
 end
 
 return M
