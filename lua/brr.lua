@@ -194,6 +194,8 @@ M.open_scratch_file = function(file)
   end
 
   buf = vim.fn.bufadd(filepath)
+  vim.api.nvim_set_option_value('swapfile', false, {buf = buf})
+
 
   if not vim.api.nvim_buf_is_loaded(buf) then
     vim.fn.bufload(buf)
@@ -224,6 +226,7 @@ M.open_scratch_file = function(file)
 
   if window and vim.api.nvim_win_is_valid(window) then
     vim.api.nvim_win_set_buf(window, buf)
+    vim.api.nvim_win_set_config(window, config)
   else
     window = vim.api.nvim_open_win(buf, true, config)
     vim.api.nvim_create_autocmd("VimResized", {
