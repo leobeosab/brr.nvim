@@ -1,6 +1,8 @@
 local pickers = require("telescope.pickers")
 local finders = require("telescope.finders")
 local conf = require("telescope.config").values
+local actions = require "telescope.actions"
+local action_state = require "telescope.actions.state"
 
 local M = {}
 
@@ -145,7 +147,6 @@ M.open_scratch_list = function()
     finder = finders.new_table {
       results = M.scratch_file_list(),
       entry_maker = function(entry)
-        print(entry[1])
         return {
           value = entry,
           display = entry[2],
@@ -154,7 +155,15 @@ M.open_scratch_list = function()
         }
       end
     },
-    previewer = conf.file_previewer({})
+    previewer = conf.file_previewer({}),
+    attach_mappings = function(prompt_bufnr, map)
+      actions.select_default:replace(function()
+        actions.close(prompt_bufnr)
+        local selection = action_state.get_selected_entry()
+        M.open_scratch_file(selection.value[2])
+      end)
+      return true
+    end,
   }):find()
 end
 
