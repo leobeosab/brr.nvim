@@ -155,6 +155,7 @@ M.open_scratch_list = function()
         }
       end
     },
+    sorter = conf.generic_sorter({}),
     previewer = conf.file_previewer({}),
     attach_mappings = function(prompt_bufnr, map)
       actions.select_default:replace(function()
@@ -203,7 +204,7 @@ M.open_scratch_file = function(file)
   end
 
   buf = vim.fn.bufadd(filepath)
-  vim.api.nvim_set_option_value('swapfile', false, {buf = buf})
+  vim.api.nvim_set_option_value('swapfile', false, { buf = buf })
 
 
   if not vim.api.nvim_buf_is_loaded(buf) then
