@@ -40,7 +40,6 @@ function M.get_files(paths, rec_depth)
       goto continue
     end
 
-    print(normalized_path)
     local file_iterator = vim.fs.dir(normalized_path, { depth = rec_depth, follow = true })
 
     -- type returned from the vim.fs.dir iterator is always a directory for some reason

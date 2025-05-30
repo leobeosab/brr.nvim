@@ -159,7 +159,7 @@ M.open_scratch_list = function()
       actions.select_default:replace(function()
         actions.close(prompt_bufnr)
         local selection = action_state.get_selected_entry()
-        M.open_scratch_file(selection.value[2])
+        M.open_scratch_file(selection.value[1])
       end)
       return true
     end,
@@ -205,10 +205,8 @@ M.open_scratch_file = function(file)
   local filepath
 
   for _, sf in ipairs(scratch_files) do
-    local sf_filename = string.gsub(sf[2], ".md", "")
-    if file == sf_filename then
+    if file == sf[1] then
       filepath = sf[1]
-      break
     end
   end
 
