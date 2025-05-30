@@ -13,9 +13,13 @@ local M = {}
 
 ---@class brr.Config
 ---@field root string
+---@field extra_paths string[]
+---@field extra_paths_depth number
 ---@field style brr.Style
 local options = {
   root = "~/.scratch_notes/",
+  extra_paths = {},
+  extra_paths_depth = 1,
   style = {
     title_padding = 2,
     width = 0.8,
@@ -36,6 +40,8 @@ local window = nil
 M.setup = function(opts)
   opts = opts or {}
   local style = opts.style or {}
+  options.extra_paths = opts.extra_paths or {}
+  options.extra_paths_depth = opts.extra_paths_depth or 1
 
   options.root = opts.root or options.root
 
@@ -126,9 +132,45 @@ end
 ---@alias FileTuple { string, string }
 ---@return table list of file names
 M.scratch_file_list = function()
+
+  local files = {}
+
+  for _, path in ipairs(options.extra_paths) do
+    local normalized_path = vim.fs.normalize(path)
+    print(normalized_path)
+    local stat = vim.uv.fs_stat(normalized_path)
+    if not stat then
+      goto continue
+    end
+
+    local is_dir = stat.type == "directory"
+
+    if not is_dir then
+      local path_split = vim.split(normalized_path, '/')
+      local filename = path_split[#path_split]
+      files[#files+1] = { normalized_path, filename }
+      goto continue
+    end
+
+    local file_iterator = vim.fs.dir(normalized_path, { depth = options.extra_paths_depth, follow = true })
+
+    -- type returned from the vim.fs.dir iterator is always a directory for some reason
+    local file = file_iterator()
+    while file ~= nil do
+      stat = vim.uv.fs_stat(normalized_path .. "/" .. file)
+      -- filter only markdown files
+      local filetype = string.sub(file, -2, -1)
+      if stat and stat.type == "file" and filetype == "md" then
+        files[#files + 1] = { normalized_path .. "/" .. file, file }
+      end
+      file = file_iterator()
+    end
+
+    ::continue::
+  end
+
   local normalized_path = vim.fs.normalize(options.root)
   local file_iterator = vim.fs.dir(normalized_path)
-  local files = {}
 
   local file = file_iterator()
   while file ~= nil do
@@ -190,11 +232,23 @@ M.open_scratch_file = function(file)
     window = nil
   end
 
-  local root = vim.fs.normalize(options.root)
+  local scratch_files = M.scratch_file_list()
+  local filepath
 
-  vim.fn.mkdir(root, "-p")
+  for _, sf in ipairs(scratch_files) do
+    local sf_filename = string.gsub(sf[2], ".md", "")
+    if file == sf_filename then
+      filepath = sf[1]
+      break
+    end
+  end
 
-  local filepath = root .. '/' .. file
+  if filepath == nil then
+    local root = vim.fs.normalize(options.root)
+    vim.fn.mkdir(root, "-p")
+    filepath = root .. '/' .. file
+  end
+
 
   -- If buf is already open, close window
   local buf = check_if_buffer_is_opened(filepath, window)
