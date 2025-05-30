@@ -4,6 +4,8 @@ local conf = require("telescope.config").values
 local actions = require "telescope.actions"
 local action_state = require "telescope.actions.state"
 
+local util = require("brr.utils")
+
 local M = {}
 
 ---@class brr.Style
@@ -20,6 +22,8 @@ local options = {
   root = "~/.scratch_notes/",
   extra_paths = {},
   extra_paths_depth = 1,
+  daily_notes_dir = "",
+  daily_notes_format = "%Y-%m-%d",
   style = {
     title_padding = 2,
     width = 0.8,
@@ -44,6 +48,8 @@ M.setup = function(opts)
   options.extra_paths_depth = opts.extra_paths_depth or 1
 
   options.root = opts.root or options.root
+  options.daily_notes_dir = opts.daily_notes_dir or options.root
+  options.daily_notes_format = opts.daily_notes_format or options.daily_notes_format
 
   for k, v in pairs(style) do
     options.style[k] = v
@@ -94,7 +100,7 @@ end
 
 ---@return string current date
 local get_current_date = function()
-  local date_format = "%Y-%m-%d"
+  local date_format = options.daily_notes_format
   return tostring(os.date(date_format)) .. ".md"
 end
 
@@ -128,66 +134,16 @@ local check_if_buffer_is_opened = function(filepath, win_id)
   return buf
 end
 
--- Gets a list of the scatch files in the root dir
----@alias FileTuple { string, string }
----@return table list of file names
-M.scratch_file_list = function()
-
-  local files = {}
-
-  for _, path in ipairs(options.extra_paths) do
-    local normalized_path = vim.fs.normalize(path)
-    print(normalized_path)
-    local stat = vim.uv.fs_stat(normalized_path)
-    if not stat then
-      goto continue
-    end
-
-    local is_dir = stat.type == "directory"
-
-    if not is_dir then
-      local path_split = vim.split(normalized_path, '/')
-      local filename = path_split[#path_split]
-      files[#files+1] = { normalized_path, filename }
-      goto continue
-    end
-
-    local file_iterator = vim.fs.dir(normalized_path, { depth = options.extra_paths_depth, follow = true })
-
-    -- type returned from the vim.fs.dir iterator is always a directory for some reason
-    local file = file_iterator()
-    while file ~= nil do
-      stat = vim.uv.fs_stat(normalized_path .. "/" .. file)
-      -- filter only markdown files
-      local filetype = string.sub(file, -2, -1)
-      if stat and stat.type == "file" and filetype == "md" then
-        files[#files + 1] = { normalized_path .. "/" .. file, file }
-      end
-      file = file_iterator()
-    end
-
-    ::continue::
-  end
-
-  local normalized_path = vim.fs.normalize(options.root)
-  local file_iterator = vim.fs.dir(normalized_path)
-
-  local file = file_iterator()
-  while file ~= nil do
-    files[#files + 1] = { normalized_path .. "/" .. file, file }
-    file = file_iterator()
-  end
-
-  return files
-end
-
 -- Uses Telescope for now, I might make this an optional dependency
 -- Opens a scratch file list of all files in the root_dir
 M.open_scratch_list = function()
+
+  local files = M.scratch_file_list()
+
   pickers.new({}, {
     prompt_title = "Scratch Files",
     finder = finders.new_table {
-      results = M.scratch_file_list(),
+      results = files,
       entry_maker = function(entry)
         return {
           value = entry,
@@ -220,12 +176,25 @@ M.close_scratch_file = function(win, buf)
   end
 end
 
+M.scratch_file_list = function(paths)
+  local pathlist
+  if not paths then
+    pathlist = util.extend({ options.root, options.daily_notes_dir }, options.extra_paths)
+  end
+
+  local files = util.get_files(pathlist, options.extra_paths_depth)
+  return files
+end
+
 
 ---@param file? string
 ---@return number buffer id
 M.open_scratch_file = function(file)
+  local new_path = options.root
+
   if not file or file == '' then
     file = get_current_date()
+    new_path = options.daily_notes_dir
   end
 
   if window and not vim.api.nvim_win_is_valid(window) then
@@ -244,9 +213,9 @@ M.open_scratch_file = function(file)
   end
 
   if filepath == nil then
-    local root = vim.fs.normalize(options.root)
-    vim.fn.mkdir(root, "-p")
-    filepath = root .. '/' .. file
+    local p = vim.fs.normalize(new_path)
+    vim.fn.mkdir(p, "-p")
+    filepath = p .. '/' .. file
   end
 
 
