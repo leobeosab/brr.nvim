@@ -1,59 +1,21 @@
 local pickers = require("telescope.pickers")
 local finders = require("telescope.finders")
-local conf = require("telescope.config").values
+local telescope_conf = require("telescope.config").values
 local actions = require "telescope.actions"
 local action_state = require "telescope.actions.state"
 
 local util = require("brr.utils")
+local conf = require("brr.conf")
+local ui = require("brr.ui")
 
 local M = {}
 
----@class brr.Style
----@field title_padding number number of spaces on each side of scratch title
----@field width number decimal value 0-1, 1 is full width, 0 is 0 width
----@field height number decimal value 0-1, 1 is full height, 0 is 0 height
 
----@class brr.Config
----@field root string
----@field extra_paths string[]
----@field extra_paths_depth number
----@field style brr.Style
-local options = {
-  root = "~/.scratch_notes/",
-  extra_paths = {},
-  extra_paths_depth = 1,
-  daily_notes_dir = "",
-  daily_notes_format = "%Y-%m-%d",
-  style = {
-    title_padding = 2,
-    width = 0.8,
-    height = 0.8,
-  }
-}
-
-local window_config = {
-  relative = "editor",
-  border = 'rounded',
-  zindex = 2,
-  title_pos = "center"
-}
-
-local window = nil
+local window = ui:new()
 
 ---@param opts brr.Config
 M.setup = function(opts)
-  opts = opts or {}
-  local style = opts.style or {}
-  options.extra_paths = opts.extra_paths or {}
-  options.extra_paths_depth = opts.extra_paths_depth or 1
-
-  options.root = opts.root or options.root
-  options.daily_notes_dir = opts.daily_notes_dir or options.root
-  options.daily_notes_format = opts.daily_notes_format or options.daily_notes_format
-
-  for k, v in pairs(style) do
-    options.style[k] = v
-  end
+  conf:apply_user_config(opts)
 end
 
 ---@class window_config
@@ -65,8 +27,8 @@ local get_win_size = function()
   local vim_width = vim.o.columns
   local vim_height = vim.o.lines
 
-  local win_width = math.floor(vim_width * options.style.width)
-  local win_height = math.floor(vim_height * options.style.height)
+  local win_width = math.floor(vim_width * conf.style.width)
+  local win_height = math.floor(vim_height * conf.style.height)
 
   local col = math.floor((vim_width - win_width) / 2)
   local row = math.floor((vim_height - win_height) / 2)
@@ -100,7 +62,7 @@ end
 
 ---@return string current date
 local get_current_date = function()
-  local date_format = options.daily_notes_format
+  local date_format = conf.daily_notes_format
   return tostring(os.date(date_format)) .. ".md"
 end
 
@@ -153,8 +115,8 @@ M.open_scratch_list = function()
         }
       end
     },
-    sorter = conf.generic_sorter({}),
-    previewer = conf.file_previewer({}),
+    sorter = telescope_conf.generic_sorter({}),
+    previewer = telescope_conf.file_previewer({}),
     attach_mappings = function(prompt_bufnr, map)
       actions.select_default:replace(function()
         actions.close(prompt_bufnr)
@@ -179,10 +141,10 @@ end
 M.scratch_file_list = function(paths)
   local pathlist
   if not paths then
-    pathlist = util.extend({ options.root, options.daily_notes_dir }, options.extra_paths)
+    pathlist = util.extend({ conf.root, conf.daily_notes_dir }, conf.extra_paths)
   end
 
-  local files = util.get_files(pathlist, options.extra_paths_depth)
+  local files = util.get_files(pathlist, conf.extra_paths_depth)
   return files
 end
 
@@ -190,15 +152,11 @@ end
 ---@param file? string
 ---@return number buffer id
 M.open_scratch_file = function(file)
-  local new_path = options.root
+  local new_path = conf.root
 
   if not file or file == '' then
     file = get_current_date()
-    new_path = options.daily_notes_dir
-  end
-
-  if window and not vim.api.nvim_win_is_valid(window) then
-    window = nil
+    new_path = conf.daily_notes_dir
   end
 
   local scratch_files = M.scratch_file_list()
@@ -218,6 +176,9 @@ M.open_scratch_file = function(file)
 
 
   -- If buf is already open, close window
+  -- TODO://
+  -- Check if window visible and buffer is the same as the file passed in
+  -- if yes close the window
   local buf = check_if_buffer_is_opened(filepath, window)
   if buf and window then
     M.close_scratch_file(window, buf)()
@@ -243,11 +204,11 @@ M.open_scratch_file = function(file)
     end
   })
 
-  local padding = string.rep(" ", options.style.title_padding)
+  local padding = string.rep(" ", conf.style.title_padding)
   local title = padding .. file .. padding
 
   local win_size = get_win_size()
-  local config = vim.fn.deepcopy(window_config)
+  local config = vim.fn.deepcopy(conf.win_config)
   config.width = win_size.width
   config.height = win_size.height
   config.row = win_size.row
